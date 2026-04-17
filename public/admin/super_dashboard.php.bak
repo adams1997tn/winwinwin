@@ -1,0 +1,563 @@
+<?php
+/**
+ * Super Admin Dashboard — Enterprise-level with DataTables, AJAX polling,
+ * wallet management, bets, P&L, withdrawals, screenshot zoom/rotate.
+ */
+require_once __DIR__ . '/super_guard.php';
+use App\Core\CsrfProtection;
+$csrf = new CsrfProtection();
+?>
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinBet — Super Admin</title>
+    <?= $csrf->metaTag() ?>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+    <style>
+        :root{--bg-body:#0d0f14;--bg-surface:#161a24;--bg-card:#1a1f2b;--gold:#f0b90b;--gold-hover:#d4a20a;--green:#22c55e;--red:#ef4444;--purple:#7c3aed;--border:#1e293b;--text-main:#e2e8f0;--text-muted:#64748b}
+        body{background:var(--bg-body);color:var(--text-main);font-family:'Segoe UI',system-ui,sans-serif}
+        .text-gold{color:var(--gold)!important}.bg-surface{background:var(--bg-surface)!important}.bg-card{background:var(--bg-card)!important}
+        .btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold-hover));color:#000;border:none;font-weight:600}
+        .btn-gold:hover{background:var(--gold-hover);color:#000;transform:translateY(-1px)}
+        .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;transition:transform .2s}
+        .stat-card:hover{transform:translateY(-2px)}
+        .stat-card .stat-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem}
+        .stat-card .stat-value{font-size:1.5rem;font-weight:700}
+        .stat-card .stat-label{font-size:.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}
+        .card-custom{background:var(--bg-card);border:1px solid var(--border);border-radius:12px}
+        .card-custom .card-header{background:var(--bg-surface);border-bottom:1px solid var(--border);border-radius:12px 12px 0 0!important;padding:14px 20px}
+        .table-dark-custom{--bs-table-bg:transparent;--bs-table-border-color:var(--border)}
+        .table-dark-custom th{color:var(--text-muted);font-size:.72rem;text-transform:uppercase;font-weight:600;letter-spacing:.5px}
+        .table-dark-custom td{vertical-align:middle;font-size:.85rem}
+        .badge-pending{background:rgba(240,185,11,.15);color:var(--gold)}.badge-approved{background:rgba(34,197,94,.15);color:var(--green)}
+        .badge-rejected{background:rgba(239,68,68,.15);color:var(--red)}.badge-active{background:rgba(34,197,94,.15);color:var(--green)}
+        .badge-suspended{background:rgba(239,68,68,.15);color:var(--red)}.badge-void{background:rgba(124,58,237,.15);color:var(--purple)}
+        .badge-won{background:rgba(34,197,94,.15);color:var(--green)}.badge-lost{background:rgba(239,68,68,.15);color:var(--red)}
+        .navbar-admin{background:var(--bg-surface);border-bottom:1px solid var(--border)}
+        .sidebar-admin{background:var(--bg-surface);border-right:1px solid var(--border);min-height:calc(100vh - 56px)}
+        .sidebar-admin .nav-link{color:var(--text-muted);padding:10px 16px;border-radius:8px;font-size:.875rem}
+        .sidebar-admin .nav-link:hover,.sidebar-admin .nav-link.active{color:var(--gold);background:rgba(240,185,11,.08)}
+        .screenshot-thumb{width:40px;height:40px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--border)}
+        .swal2-popup{background:var(--bg-card)!important;color:var(--text-main)!important;border:1px solid var(--border)}
+        .swal2-title{color:var(--text-main)!important}.swal2-html-container{color:var(--text-muted)!important}
+        .swal2-confirm{background:var(--gold)!important;color:#000!important;font-weight:600}
+        .swal2-cancel{background:var(--bg-surface)!important;color:var(--text-main)!important;border:1px solid var(--border)!important}
+        .swal2-input,.swal2-select,.swal2-textarea{background:var(--bg-surface)!important;color:var(--text-main)!important;border:1px solid var(--border)!important}
+        .dataTables_wrapper .dataTables_filter input,.dataTables_wrapper .dataTables_length select{background:var(--bg-surface);color:var(--text-main);border:1px solid var(--border);border-radius:6px;padding:4px 8px}
+        .dataTables_wrapper .dataTables_info,.dataTables_wrapper .dataTables_paginate{color:var(--text-muted);font-size:.8rem}
+        .dataTables_wrapper .dataTables_paginate .paginate_button{color:var(--text-muted)!important;background:transparent!important;border:1px solid var(--border)!important;border-radius:4px;margin:0 2px}
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current{background:var(--gold)!important;color:#000!important;border-color:var(--gold)!important}
+        .dataTables_wrapper .dataTables_paginate .paginate_button:hover{background:var(--bg-surface)!important;color:var(--gold)!important}
+        .pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+        #screenshot-modal img{max-width:100%;max-height:80vh;transition:transform .3s}
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark navbar-admin sticky-top px-3">
+    <a class="navbar-brand fw-bold" href="#">
+        <i class="bi bi-shield-fill-check text-gold"></i> WinBet Super Admin
+    </a>
+    <div class="d-flex align-items-center gap-3">
+        <span class="pulse-dot" title="Live polling active"></span>
+        <span class="badge bg-warning text-dark"><i class="bi bi-star-fill"></i> SUPER ADMIN</span>
+        <span class="text-muted small"><i class="bi bi-person-fill"></i> <?= htmlspecialchars($adminUser['username']) ?></span>
+        <a href="/bet/public/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-house"></i> Site</a>
+    </div>
+</nav>
+
+<div class="container-fluid"><div class="row">
+
+<!-- SIDEBAR -->
+<nav class="col-lg-2 col-md-3 d-none d-md-block sidebar-admin py-3 px-2">
+    <div class="nav flex-column gap-1">
+        <a class="nav-link active" href="#" data-tab="dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
+        <a class="nav-link" href="#" data-tab="agents"><i class="bi bi-people-fill"></i> Agents</a>
+        <a class="nav-link" href="#" data-tab="users"><i class="bi bi-people"></i> Users</a>
+        <a class="nav-link" href="#" data-tab="deposits"><i class="bi bi-cash-stack"></i> Deposits</a>
+        <a class="nav-link" href="#" data-tab="withdrawals"><i class="bi bi-wallet2"></i> Withdrawals</a>
+        <a class="nav-link" href="#" data-tab="bets"><i class="bi bi-trophy"></i> Bets</a>
+        <a class="nav-link" href="#" data-tab="wallet"><i class="bi bi-bank"></i> Wallet / Ledger</a>
+        <a class="nav-link" href="#" data-tab="pnl"><i class="bi bi-graph-up-arrow"></i> P&L Analytics</a>
+        <hr class="border-secondary">
+        <a class="nav-link" href="/bet/public/agent/"><i class="bi bi-arrow-left"></i> Agent Panel</a>
+    </div>
+</nav>
+
+<main class="col-lg-10 col-md-9 p-4">
+
+<!-- ═══ DASHBOARD ═══ -->
+<div id="tab-dashboard" class="tab-panel">
+    <h5 class="mb-4 text-gold"><i class="bi bi-speedometer2"></i> Dashboard <small class="text-muted fs-6" id="last-poll-time"></small></h5>
+    <div class="row g-3 mb-4" id="stats-row"></div>
+    <div class="row g-4">
+        <div class="col-lg-8"><div class="card-custom p-3"><canvas id="depositChart" height="100"></canvas></div></div>
+        <div class="col-lg-4">
+            <div class="card-custom">
+                <div class="card-header d-flex justify-content-between"><span><i class="bi bi-hourglass-split text-warning"></i> Recent Pending</span><span class="badge bg-warning text-dark" id="pending-badge">0</span></div>
+                <div class="card-body p-0" style="max-height:400px;overflow-y:auto"><table class="table table-dark-custom table-sm mb-0"><tbody id="pending-mini-list"></tbody></table></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ AGENTS ═══ -->
+<div id="tab-agents" class="tab-panel d-none">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="text-gold mb-0"><i class="bi bi-people-fill"></i> Agent Management</h5>
+        <button class="btn btn-gold btn-sm" onclick="createAgentDialog()"><i class="bi bi-plus-lg"></i> New Agent</button>
+    </div>
+    <div class="card-custom"><div class="card-body"><table id="agents-table" class="table table-dark-custom table-sm w-100"><thead><tr><th>ID</th><th>Username</th><th>Code</th><th>Users</th><th>Balance</th><th>Status</th><th>Deposits</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+
+<!-- ═══ USERS ═══ -->
+<div id="tab-users" class="tab-panel d-none">
+    <h5 class="mb-4 text-gold"><i class="bi bi-people"></i> User Management</h5>
+    <div class="card-custom"><div class="card-body"><table id="users-table" class="table table-dark-custom table-sm w-100"><thead><tr><th>ID</th><th>Username</th><th>Agent</th><th>Balance</th><th>Role</th><th>Bets</th><th>Wagered</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+
+<!-- ═══ DEPOSITS ═══ -->
+<div id="tab-deposits" class="tab-panel d-none">
+    <h5 class="mb-4 text-gold"><i class="bi bi-cash-stack"></i> Deposit Requests</h5>
+    <div class="card-custom"><div class="card-body"><table id="deposits-table" class="table table-dark-custom table-sm w-100"><thead><tr><th>ID</th><th>User</th><th>Agent</th><th>Method</th><th>Amount</th><th>Code</th><th>Data</th><th>Screenshot</th><th>Status</th><th>Time</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+
+<!-- ═══ WITHDRAWALS ═══ -->
+<div id="tab-withdrawals" class="tab-panel d-none">
+    <h5 class="mb-4 text-gold"><i class="bi bi-wallet2"></i> Withdrawal Requests</h5>
+    <div class="card-custom"><div class="card-body"><table id="withdrawals-table" class="table table-dark-custom table-sm w-100"><thead><tr><th>ID</th><th>Agent</th><th>Code</th><th>Amount</th><th>Method</th><th>Details</th><th>Status</th><th>Time</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+
+<!-- ═══ BETS ═══ -->
+<div id="tab-bets" class="tab-panel d-none">
+    <h5 class="mb-4 text-gold"><i class="bi bi-trophy"></i> Bet Monitoring</h5>
+    <div class="card-custom"><div class="card-body"><table id="bets-table" class="table table-dark-custom table-sm w-100"><thead><tr><th>ID</th><th>User</th><th>Agent</th><th>Event</th><th>Stake</th><th>Odds</th><th>Payout</th><th>Status</th><th>Time</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+
+<!-- ═══ WALLET / LEDGER ═══ -->
+<div id="tab-wallet" class="tab-panel d-none">
+    <h5 class="mb-4 text-gold"><i class="bi bi-bank"></i> Wallet & Ledger</h5>
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card-custom p-3">
+                <h6 class="text-gold mb-3"><i class="bi bi-plus-circle"></i> Manual Wallet Adjustment</h6>
+                <form id="wallet-form">
+                    <div class="row g-2">
+                        <div class="col-4"><input type="number" class="form-control form-control-sm bg-surface" id="wallet-user-id" placeholder="User ID" required></div>
+                        <div class="col-4"><input type="number" step="0.001" class="form-control form-control-sm bg-surface" id="wallet-amount" placeholder="Amount" required></div>
+                        <div class="col-4">
+                            <select class="form-select form-select-sm bg-surface" id="wallet-action"><option value="add">Add Funds</option><option value="remove">Remove Funds</option></select>
+                        </div>
+                        <div class="col-8"><input type="text" class="form-control form-control-sm bg-surface" id="wallet-reason" placeholder="Reason (mandatory)" required></div>
+                        <div class="col-4"><button type="submit" class="btn btn-gold btn-sm w-100">Apply</button></div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card-custom p-3">
+                <h6 class="text-gold mb-3"><i class="bi bi-search"></i> User Balance Lookup</h6>
+                <div class="row g-2">
+                    <div class="col-8"><input type="number" class="form-control form-control-sm bg-surface" id="lookup-user-id" placeholder="User ID"></div>
+                    <div class="col-4"><button class="btn btn-outline-warning btn-sm w-100" onclick="lookupLedger()">View Ledger</button></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-custom"><div class="card-body"><table id="ledger-table" class="table table-dark-custom table-sm w-100"><thead><tr><th>ID</th><th>User</th><th>Action</th><th>Amount</th><th>Before</th><th>After</th><th>Source</th><th>Note</th><th>By</th><th>IP</th><th>Time</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+
+<!-- ═══ P&L ═══ -->
+<div id="tab-pnl" class="tab-panel d-none">
+    <h5 class="mb-4 text-gold"><i class="bi bi-graph-up-arrow"></i> Profit & Loss Analytics</h5>
+    <div class="row g-3 mb-4" id="pnl-stats-row"></div>
+    <div class="card-custom"><div class="card-header"><i class="bi bi-bar-chart"></i> Per-Agent Breakdown</div><div class="card-body"><table id="pnl-table" class="table table-dark-custom table-sm w-100"><thead><tr><th>Agent</th><th>Code</th><th>Users</th><th>Balance</th><th>Stakes</th><th>Payouts</th><th>Deposits</th><th>Net P&L</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+
+</main></div></div>
+
+<!-- Screenshot Modal -->
+<div class="modal fade" id="screenshot-modal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content bg-card border-secondary">
+    <div class="modal-header border-secondary"><h6 class="modal-title text-gold">Screenshot Viewer</h6>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary" onclick="rotateImg(-90)"><i class="bi bi-arrow-counterclockwise"></i></button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="rotateImg(90)"><i class="bi bi-arrow-clockwise"></i></button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="zoomImg(1.2)"><i class="bi bi-zoom-in"></i></button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="zoomImg(0.8)"><i class="bi bi-zoom-out"></i></button>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+    </div>
+    <div class="modal-body text-center p-2"><img id="screenshot-img" src="" style="transform-origin:center center"></div>
+</div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const API = '/bet/public/api/super_admin_api.php';
+const CSRF = () => document.querySelector('meta[name="csrf-token"]')?.content;
+const POLL_INTERVAL = 15000;
+let pollTimer = null;
+let imgRotation=0, imgZoom=1;
+let depositChart = null;
+let dtAgents,dtUsers,dtDeposits,dtWithdrawals,dtBets,dtLedger,dtPnl;
+
+// ═══ API HELPERS ═══
+async function apiGet(action, params='') {
+    const r = await fetch(`${API}?action=${action}${params}`, {headers:{'X-Requested-With':'XMLHttpRequest','Bypass-Tunnel-Reminder':'true'}});
+    return r.json();
+}
+async function apiPost(data) {
+    data._csrf_token = CSRF();
+    const r = await fetch(API, {method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest','Bypass-Tunnel-Reminder':'true'},body:JSON.stringify(data)});
+    return r.json();
+}
+
+// ═══ TAB NAVIGATION ═══
+document.querySelectorAll('[data-tab]').forEach(link => {
+    link.addEventListener('click', e => {
+        e.preventDefault();
+        showTab(link.dataset.tab);
+    });
+});
+
+function showTab(name) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('d-none'));
+    document.getElementById('tab-' + name)?.classList.remove('d-none');
+    document.querySelectorAll('[data-tab]').forEach(l => l.classList.toggle('active', l.dataset.tab === name));
+    if (name === 'agents') loadAgents();
+    if (name === 'users') loadUsers();
+    if (name === 'deposits') loadDeposits();
+    if (name === 'withdrawals') loadWithdrawals();
+    if (name === 'bets') loadBets();
+    if (name === 'wallet') loadLedger();
+    if (name === 'pnl') loadPnL();
+}
+
+// ═══ DASHBOARD ═══
+async function loadDashboard() {
+    const [statsR, chartR] = await Promise.all([apiGet('global_stats'), apiGet('deposit_chart', '&days=7')]);
+    if (statsR.success) renderStats(statsR.stats, statsR.deposit_stats);
+    if (chartR.success) renderChart(chartR.chart);
+    document.getElementById('last-poll-time').textContent = '(updated ' + new Date().toLocaleTimeString() + ')';
+    // Load pending mini-list
+    const depR = await apiGet('deposits', '&status=pending&limit=10');
+    if (depR.success) {
+        const tbody = document.getElementById('pending-mini-list');
+        document.getElementById('pending-badge').textContent = depR.deposits.length;
+        tbody.innerHTML = depR.deposits.map(d => `<tr><td class="px-3 py-2"><div class="d-flex justify-content-between"><span>${esc(d.user_name)}</span><span class="text-warning fw-bold">€${num(d.amount)}</span></div><small class="text-muted">${esc(d.method_name)} • ${timeAgo(d.created_at)}</small></td></tr>`).join('') || '<tr><td class="px-3 py-2 text-muted text-center">No pending deposits</td></tr>';
+    }
+}
+
+function renderStats(s, d) {
+    const items = [
+        {label:'Total Users',value:s.total_users,icon:'bi-people',color:'purple'},
+        {label:'Agents',value:s.total_agents,icon:'bi-person-badge',color:'gold'},
+        {label:'Pending Deposits',value:d.pending_count,icon:'bi-hourglass-split',color:'warning',cls:'text-warning'},
+        {label:'Approved Total',value:'€'+num(d.total_approved_amount),icon:'bi-check-circle',color:'success',cls:'text-success'},
+        {label:'Total Bets',value:s.total_bets,icon:'bi-trophy',color:'info'},
+        {label:'Total Wagered',value:'€'+num(s.total_wagered),icon:'bi-cash-coin',color:'primary'},
+        {label:'Pending Withdrawals',value:s.pending_withdrawals,icon:'bi-wallet2',color:'warning',cls:'text-warning'},
+        {label:'User Balances',value:'€'+num(s.total_user_balance),icon:'bi-bank2',color:'success',cls:'text-success'}
+    ];
+    document.getElementById('stats-row').innerHTML = items.map(i => `
+        <div class="col-xl-3 col-sm-6"><div class="stat-card"><div class="d-flex justify-content-between"><div><div class="stat-label">${i.label}</div><div class="stat-value ${i.cls||''}">${i.value}</div></div><div class="stat-icon" style="background:rgba(var(--bs-${i.color}-rgb),.12)"><i class="bi ${i.icon}"></i></div></div></div></div>
+    `).join('');
+}
+
+function renderChart(c) {
+    const ctx = document.getElementById('depositChart').getContext('2d');
+    if (depositChart) depositChart.destroy();
+    depositChart = new Chart(ctx, {
+        type:'bar', data:{labels:c.labels,datasets:[
+            {label:'Approved',data:c.approved,backgroundColor:'rgba(34,197,94,.6)',borderRadius:4},
+            {label:'Rejected',data:c.rejected,backgroundColor:'rgba(239,68,68,.6)',borderRadius:4}
+        ]}, options:{responsive:true,plugins:{legend:{labels:{color:'#64748b'}}},scales:{x:{ticks:{color:'#64748b'},grid:{color:'#1e293b'}},y:{ticks:{color:'#64748b'},grid:{color:'#1e293b'}}}}
+    });
+}
+
+// ═══ AGENTS ═══
+function loadAgents() {
+    apiGet('agents').then(r => {
+        if (!r.success) return;
+        if (dtAgents) dtAgents.destroy();
+        const tbody = document.querySelector('#agents-table tbody');
+        tbody.innerHTML = r.agents.map(a => `<tr>
+            <td>${a.id}</td><td><strong>${esc(a.username)}</strong></td><td><code>${esc(a.agent_code)}</code></td>
+            <td>${a.user_count||0}</td><td>€${num(a.balance)}</td>
+            <td><span class="badge badge-${a.agent_status}">${a.agent_status}</span>${a.banned==1?' <span class="badge bg-danger">BANNED</span>':''}</td>
+            <td>${a.total_requests} <small class="text-muted">(${a.pending_requests} pending)</small></td>
+            <td>
+                <button class="btn btn-sm btn-outline-warning" onclick="editAgentDialog(${a.id},'${esc(a.username)}','${a.agent_status}',${a.banned})"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-${a.banned==1?'success':'danger'}" onclick="toggleBan(${a.id},${a.banned==1?'false':'true'})"><i class="bi bi-${a.banned==1?'unlock':'lock'}"></i></button>
+            </td>
+        </tr>`).join('');
+        dtAgents = $('#agents-table').DataTable({order:[[0,'desc']],pageLength:25,language:{emptyTable:'No agents found'}});
+    });
+}
+
+function createAgentDialog() {
+    Swal.fire({
+        title:'Create Agent',html:`
+            <input id="sa-user" class="swal2-input" placeholder="Username">
+            <input id="sa-pass" class="swal2-input" placeholder="Password" type="password">
+            <input id="sa-phone" class="swal2-input" placeholder="Phone (optional)">`,
+        showCancelButton:true,confirmButtonText:'Create',
+        preConfirm:() => apiPost({action:'create_agent',username:$('#sa-user').val(),password:$('#sa-pass').val(),phone:$('#sa-phone').val()})
+    }).then(r => { if(r.isConfirmed && r.value?.success) { Toast.fire({icon:'success',title:r.value.message}); loadAgents(); }
+        else if(r.value?.error) Toast.fire({icon:'error',title:r.value.error}); });
+}
+
+function editAgentDialog(id,username,status,banned) {
+    Swal.fire({
+        title:`Edit: ${username}`,html:`
+            <select id="se-status" class="swal2-select"><option value="active" ${status==='active'?'selected':''}>Active</option><option value="suspended" ${status==='suspended'?'selected':''}>Suspended</option></select>
+            <input id="se-pass" class="swal2-input" placeholder="New password (optional)" type="password">
+            <input id="se-phone" class="swal2-input" placeholder="Phone">`,
+        showCancelButton:true,confirmButtonText:'Save',
+        preConfirm:() => apiPost({action:'update_agent',agent_id:id,agent_status:$('#se-status').val(),password:$('#se-pass').val(),phone:$('#se-phone').val()})
+    }).then(r => { if(r.isConfirmed && r.value?.success) { Toast.fire({icon:'success',title:r.value.message}); loadAgents(); }
+        else if(r.value?.error) Toast.fire({icon:'error',title:r.value.error}); });
+}
+
+function toggleBan(id, ban) {
+    apiPost({action:'toggle_agent_ban',agent_id:id,banned:ban}).then(r => {
+        Toast.fire({icon:r.success?'success':'error',title:r.message||r.error}); if(r.success) loadAgents();
+    });
+}
+
+// ═══ USERS ═══
+function loadUsers() {
+    apiGet('users','&limit=500').then(r => {
+        if (!r.success) return;
+        if (dtUsers) dtUsers.destroy();
+        document.querySelector('#users-table tbody').innerHTML = r.users.map(u => `<tr>
+            <td>${u.id}</td><td><strong>${esc(u.username)}</strong></td><td>${esc(u.agent_name||'House')}</td>
+            <td>€${num(u.balance)}</td><td><span class="badge bg-${u.role==='super_admin'?'danger':u.role==='admin'?'warning':u.role==='agent'?'info':'secondary'}">${u.role}</span>${u.banned==1?' <span class="badge bg-danger">BAN</span>':''}</td>
+            <td>${u.bet_count}</td><td>€${num(u.total_wagered)}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-warning" onclick="changeRoleDialog(${u.id},'${esc(u.username)}','${u.role}')"><i class="bi bi-person-gear"></i></button>
+                <button class="btn btn-sm btn-outline-info" onclick="walletDialog(${u.id},'${esc(u.username)}',${u.balance})"><i class="bi bi-wallet"></i></button>
+            </td>
+        </tr>`).join('');
+        dtUsers = $('#users-table').DataTable({order:[[0,'desc']],pageLength:25});
+    });
+}
+
+function changeRoleDialog(id, username, currentRole) {
+    Swal.fire({
+        title:`Change Role: ${username}`,
+        input:'select',inputOptions:{user:'User',agent:'Agent',admin:'Admin',super_admin:'Super Admin'},inputValue:currentRole,
+        showCancelButton:true,confirmButtonText:'Change',
+        preConfirm:val => apiPost({action:'change_role',user_id:id,new_role:val})
+    }).then(r => { if(r.isConfirmed && r.value?.success) { Toast.fire({icon:'success',title:r.value.message}); loadUsers(); }
+        else if(r.value?.error) Toast.fire({icon:'error',title:r.value.error}); });
+}
+
+function walletDialog(id, username, balance) {
+    Swal.fire({
+        title:`Wallet: ${username}`,html:`<p>Current: <strong>€${num(balance)}</strong></p>
+            <select id="sw-act" class="swal2-select"><option value="wallet_add">Add Funds</option><option value="wallet_remove">Remove Funds</option></select>
+            <input id="sw-amt" class="swal2-input" placeholder="Amount" type="number" step="0.001">
+            <input id="sw-reason" class="swal2-input" placeholder="Reason (required)">`,
+        showCancelButton:true,confirmButtonText:'Apply',
+        preConfirm:() => apiPost({action:$('#sw-act').val(),user_id:id,amount:parseFloat($('#sw-amt').val()),reason:$('#sw-reason').val()})
+    }).then(r => { if(r.isConfirmed && r.value?.success) { Toast.fire({icon:'success',title:r.value.message}); loadUsers(); }
+        else if(r.value?.error) Toast.fire({icon:'error',title:r.value.error}); });
+}
+
+// ═══ DEPOSITS ═══
+function loadDeposits() {
+    apiGet('deposits','&limit=500').then(r => {
+        if (!r.success) return;
+        if (dtDeposits) dtDeposits.destroy();
+        document.querySelector('#deposits-table tbody').innerHTML = r.deposits.map(d => `<tr>
+            <td>${d.id}</td><td>${esc(d.user_name)}</td><td>${esc(d.agent_name)}</td><td>${esc(d.method_name)}</td>
+            <td class="fw-bold">€${num(d.amount)}</td><td><code>${esc(d.transaction_code)}</code></td>
+            <td>${renderSubmittedData(d.submitted_data)}</td>
+            <td>${d.screenshot_path ? `<img src="/bet/uploads/transactions/${esc(d.screenshot_path)}" class="screenshot-thumb" onclick="showScreenshot('/bet/uploads/transactions/${esc(d.screenshot_path)}')">` : '-'}</td>
+            <td><span class="badge badge-${d.status}">${d.status}</span></td>
+            <td><small>${timeAgo(d.created_at)}</small></td>
+            <td>${d.status==='pending'?`
+                <button class="btn btn-sm btn-success" onclick="approveDeposit(${d.id})"><i class="bi bi-check"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="rejectDeposit(${d.id})"><i class="bi bi-x"></i></button>`:''}</td>
+        </tr>`).join('');
+        dtDeposits = $('#deposits-table').DataTable({order:[[0,'desc']],pageLength:25});
+    });
+}
+
+function renderSubmittedData(data) {
+    if (!data || typeof data !== 'object' || Object.keys(data).length === 0) return '-';
+    return Object.entries(data).map(([k,v]) => `<small class="d-block"><span class="text-muted">${esc(k)}:</span> ${esc(v)}</small>`).join('');
+}
+
+function approveDeposit(id) {
+    Swal.fire({title:'Approve deposit #'+id+'?',text:'This will credit the user\'s wallet.',icon:'question',showCancelButton:true,confirmButtonText:'Approve'}).then(r => {
+        if(r.isConfirmed) apiPost({action:'approve_deposit',request_id:id}).then(r2 => {
+            Toast.fire({icon:r2.success?'success':'error',title:r2.message||r2.error}); if(r2.success){loadDeposits();loadDashboard();}
+        });
+    });
+}
+function rejectDeposit(id) {
+    Swal.fire({title:'Reject deposit #'+id,input:'text',inputLabel:'Reason (optional)',showCancelButton:true,confirmButtonText:'Reject',confirmButtonColor:'#ef4444'}).then(r => {
+        if(r.isConfirmed) apiPost({action:'reject_deposit',request_id:id,reason:r.value||''}).then(r2 => {
+            Toast.fire({icon:r2.success?'success':'error',title:r2.message||r2.error}); if(r2.success){loadDeposits();loadDashboard();}
+        });
+    });
+}
+
+// ═══ WITHDRAWALS ═══
+function loadWithdrawals() {
+    apiGet('withdrawals','&limit=500').then(r => {
+        if (!r.success) return;
+        if (dtWithdrawals) dtWithdrawals.destroy();
+        document.querySelector('#withdrawals-table tbody').innerHTML = r.withdrawals.map(w => `<tr>
+            <td>${w.id}</td><td><strong>${esc(w.agent_name)}</strong></td><td><code>${esc(w.agent_code)}</code></td>
+            <td class="fw-bold">€${num(w.amount)}</td><td>${esc(w.method)}</td><td><small>${esc(w.account_details)}</small></td>
+            <td><span class="badge badge-${w.status}">${w.status}</span></td>
+            <td><small>${timeAgo(w.created_at)}</small></td>
+            <td>${w.status==='pending'?`
+                <button class="btn btn-sm btn-success" onclick="approveWithdrawal(${w.id})"><i class="bi bi-check"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="rejectWithdrawal(${w.id})"><i class="bi bi-x"></i></button>`:
+                (w.processed_by_name?`<small class="text-muted">by ${esc(w.processed_by_name)}</small>`:'')}</td>
+        </tr>`).join('');
+        dtWithdrawals = $('#withdrawals-table').DataTable({order:[[0,'desc']],pageLength:25});
+    });
+}
+
+function approveWithdrawal(id) {
+    Swal.fire({title:'Approve withdrawal #'+id+'?',text:'This will debit the agent\'s balance.',icon:'question',showCancelButton:true,confirmButtonText:'Approve'}).then(r => {
+        if(r.isConfirmed) apiPost({action:'approve_withdrawal',request_id:id}).then(r2 => {
+            Toast.fire({icon:r2.success?'success':'error',title:r2.message||r2.error}); if(r2.success) loadWithdrawals();
+        });
+    });
+}
+function rejectWithdrawal(id) {
+    Swal.fire({title:'Reject withdrawal #'+id,input:'text',inputLabel:'Reason',showCancelButton:true,confirmButtonText:'Reject',confirmButtonColor:'#ef4444'}).then(r => {
+        if(r.isConfirmed) apiPost({action:'reject_withdrawal',request_id:id,reason:r.value||''}).then(r2 => {
+            Toast.fire({icon:r2.success?'success':'error',title:r2.message||r2.error}); if(r2.success) loadWithdrawals();
+        });
+    });
+}
+
+// ═══ BETS ═══
+function loadBets() {
+    apiGet('bets','&limit=500').then(r => {
+        if (!r.success) return;
+        if (dtBets) dtBets.destroy();
+        document.querySelector('#bets-table tbody').innerHTML = r.bets.map(b => `<tr>
+            <td>${b.id}</td><td>${esc(b.user_name)}</td><td>${esc(b.agent_name||'House')}</td>
+            <td><small>${esc(b.event_name||'')} — ${esc(b.market_name||'')} → ${esc(b.outcome_name||'')}</small></td>
+            <td class="fw-bold">€${num(b.stake)}</td><td>${parseFloat(b.odds||0).toFixed(2)}</td><td>€${num(b.potential_payout)}</td>
+            <td><span class="badge badge-${b.status}">${b.status}</span></td>
+            <td><small>${timeAgo(b.created_at)}</small></td>
+            <td>${b.status==='pending'?`<button class="btn btn-sm btn-outline-danger" onclick="voidBet(${b.id})"><i class="bi bi-slash-circle"></i> Void</button>`:''}</td>
+        </tr>`).join('');
+        dtBets = $('#bets-table').DataTable({order:[[0,'desc']],pageLength:25});
+    });
+}
+
+function voidBet(id) {
+    Swal.fire({title:'Void bet #'+id+'?',text:'Stake will be refunded to the user.',icon:'warning',showCancelButton:true,confirmButtonText:'Void It'}).then(r => {
+        if(r.isConfirmed) apiPost({action:'void_bet',bet_id:id}).then(r2 => {
+            Toast.fire({icon:r2.success?'success':'error',title:r2.message||r2.error}); if(r2.success) loadBets();
+        });
+    });
+}
+
+// ═══ WALLET / LEDGER ═══
+function loadLedger(userId) {
+    const params = userId ? `&user_id=${userId}&limit=500` : '&limit=500';
+    apiGet('wallet_ledger', params).then(r => {
+        if (!r.success) return;
+        if (dtLedger) dtLedger.destroy();
+        document.querySelector('#ledger-table tbody').innerHTML = r.ledger.map(l => `<tr>
+            <td>${l.id}</td><td>${esc(l.user_name||'')}</td>
+            <td><span class="badge ${l.action==='credit'?'badge-approved':'badge-rejected'}">${l.action}</span></td>
+            <td class="fw-bold">€${num(l.amount)}</td><td>€${num(l.balance_before)}</td><td>€${num(l.balance_after)}</td>
+            <td><small>${esc(l.source_type)}</small></td><td><small>${esc(l.reference_note)}</small></td>
+            <td><small>${esc(l.performed_by_name||'-')}</small></td><td><small class="text-muted">${esc(l.ip_address||'')}</small></td>
+            <td><small>${timeAgo(l.created_at)}</small></td>
+        </tr>`).join('');
+        dtLedger = $('#ledger-table').DataTable({order:[[0,'desc']],pageLength:25});
+    });
+}
+
+function lookupLedger() {
+    const uid = parseInt(document.getElementById('lookup-user-id').value);
+    if (uid > 0) loadLedger(uid);
+    else loadLedger();
+}
+
+document.getElementById('wallet-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const action = document.getElementById('wallet-action').value === 'add' ? 'wallet_add' : 'wallet_remove';
+    apiPost({action, user_id:parseInt($('#wallet-user-id').val()), amount:parseFloat($('#wallet-amount').val()), reason:$('#wallet-reason').val()}).then(r => {
+        Toast.fire({icon:r.success?'success':'error',title:r.message||r.error});
+        if(r.success) { loadLedger(); this.reset(); }
+    });
+});
+
+// ═══ P&L ═══
+async function loadPnL() {
+    const [globalR, agentsR] = await Promise.all([apiGet('pnl_global'), apiGet('pnl_per_agent')]);
+    if (globalR.success) {
+        const p = globalR.pnl;
+        const items = [
+            {label:'Total Stakes',value:'€'+num(p.total_stakes),cls:'text-info'},
+            {label:'Total Payouts',value:'€'+num(p.total_payouts),cls:'text-danger'},
+            {label:'Net P&L',value:'€'+num(p.net_pnl),cls:parseFloat(p.net_pnl)>=0?'text-success':'text-danger'},
+            {label:'Total Deposits',value:'€'+num(p.total_deposits),cls:'text-success'},
+            {label:'Agent Withdrawals',value:'€'+num(p.agent_withdrawals),cls:'text-warning'},
+        ];
+        document.getElementById('pnl-stats-row').innerHTML = items.map(i => `
+            <div class="col-xl-2 col-sm-4"><div class="stat-card"><div class="stat-label">${i.label}</div><div class="stat-value ${i.cls}">${i.value}</div></div></div>
+        `).join('');
+    }
+    if (agentsR.success) {
+        if (dtPnl) dtPnl.destroy();
+        document.querySelector('#pnl-table tbody').innerHTML = agentsR.agents.map(a => `<tr>
+            <td><strong>${esc(a.agent_name)}</strong></td><td><code>${esc(a.agent_code)}</code></td>
+            <td>${a.user_count}</td><td>€${num(a.agent_balance)}</td>
+            <td>€${num(a.total_stakes)}</td><td>€${num(a.total_payouts)}</td><td>€${num(a.total_deposits)}</td>
+            <td class="${parseFloat(a.net_pnl)>=0?'text-success':'text-danger'} fw-bold">€${num(a.net_pnl)}</td>
+        </tr>`).join('');
+        dtPnl = $('#pnl-table').DataTable({order:[[7,'desc']],pageLength:25});
+    }
+}
+
+// ═══ SCREENSHOT VIEWER ═══
+function showScreenshot(url) {
+    imgRotation=0; imgZoom=1;
+    document.getElementById('screenshot-img').src = url;
+    document.getElementById('screenshot-img').style.transform = '';
+    new bootstrap.Modal(document.getElementById('screenshot-modal')).show();
+}
+function rotateImg(deg) { imgRotation += deg; updateImgTransform(); }
+function zoomImg(factor) { imgZoom *= factor; updateImgTransform(); }
+function updateImgTransform() { document.getElementById('screenshot-img').style.transform = `rotate(${imgRotation}deg) scale(${imgZoom})`; }
+
+// ═══ UTILS ═══
+function esc(s) { if(s==null) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+function num(v) { return parseFloat(v||0).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:3}); }
+function timeAgo(ts) { if(!ts) return '-'; const d=new Date(ts.replace(' ','T')); const s=Math.floor((Date.now()-d)/1000); if(s<60) return s+'s ago'; if(s<3600) return Math.floor(s/60)+'m ago'; if(s<86400) return Math.floor(s/3600)+'h ago'; return d.toLocaleDateString(); }
+
+const Toast = Swal.mixin({toast:true,position:'top-end',showConfirmButton:false,timer:3000,timerProgressBar:true});
+
+// ═══ POLLING ═══
+function startPolling() { loadDashboard(); pollTimer = setInterval(loadDashboard, POLL_INTERVAL); }
+function stopPolling() { clearInterval(pollTimer); }
+
+// Init
+startPolling();
+</script>
+</body>
+</html>

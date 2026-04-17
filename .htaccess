@@ -1,0 +1,13 @@
+RewriteEngine On
+
+# If the request is not for an existing file/dir in the project root,
+# forward it into the public/ directory.
+RewriteCond %{REQUEST_URI} !^/bet/\.htaccess$
+RewriteCond %{DOCUMENT_ROOT}/bet/public%{REQUEST_URI} -f [OR]
+RewriteCond %{DOCUMENT_ROOT}/bet/public%{REQUEST_URI} -d
+RewriteRule ^(.*)$ public/$1 [L]
+
+# Default: serve public/index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ public/$1 [L]

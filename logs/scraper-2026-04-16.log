@@ -1,0 +1,67 @@
+[2026-04-16 12:43:00] [INFO] === Cron scrape started ===
+[2026-04-16 12:43:00] [INFO] Starting schedule scrape...
+[2026-04-16 12:43:00] [INFO] Fetching: https://sf-betting-api.sft-spb.com/prematch/main?json&l=fr&public=fzs_EUR
+[2026-04-16 12:43:02] [INFO] Schedules done. Sports processed: 54
+[2026-04-16 12:43:02] [INFO] Starting odds scrape...
+[2026-04-16 12:43:02] [INFO] Fetching: https://sf-betting-api.sft-spb.com/prematch/lastminute/1/8/?json&l=fr&public=fzs_EUR
+[2026-04-16 12:43:03] [INFO] Odds done. Matches: 58, Odds: 580
+[2026-04-16 12:43:03] [INFO] Deactivated 3 expired matches.
+[2026-04-16 12:43:03] [INFO] === Cron scrape completed ===
+[2026-04-16 13:34:59] [INFO] === Settlement cron started ===
+[2026-04-16 13:34:59] [INFO] Settlement done. Matches resolved: 0, Bets settled: 0 (Won: 0, Lost: 0), Payouts: €0.00, Time: 7ms
+[2026-04-16 13:34:59] [INFO] === Settlement cron completed ===
+[2026-04-16 14:35:51] [INFO] === Cron scrape started ===
+[2026-04-16 14:35:51] [INFO] Starting schedule scrape...
+[2026-04-16 14:35:53] [INFO] Schedules done. Sports processed: 52
+[2026-04-16 14:35:53] [INFO] Starting deep scrape for 50 sports...
+[2026-04-16 14:35:56] [INFO] Batch 1/10 done. Running total: 147 matches, 620 odds
+[2026-04-16 14:36:00] [INFO] Batch 2/10 done. Running total: 157 matches, 620 odds
+[2026-04-16 14:36:04] [INFO] Batch 3/10 done. Running total: 352 matches, 620 odds
+[2026-04-16 14:36:09] [INFO] Batch 4/10 done. Running total: 355 matches, 620 odds
+[2026-04-16 14:36:12] [INFO] Batch 5/10 done. Running total: 376 matches, 620 odds
+[2026-04-16 14:36:16] [INFO] Batch 6/10 done. Running total: 404 matches, 620 odds
+[2026-04-16 14:36:20] [INFO] Batch 7/10 done. Running total: 412 matches, 620 odds
+[2026-04-16 14:36:25] [INFO] Batch 8/10 done. Running total: 412 matches, 620 odds
+[2026-04-16 14:36:30] [INFO] Batch 9/10 done. Running total: 426 matches, 620 odds
+[2026-04-16 14:36:36] [INFO] Batch 10/10 done. Running total: 426 matches, 620 odds
+[2026-04-16 14:36:36] [INFO] Deep scrape complete. Matches: 426, Odds: 620, Deactivated: 0
+[2026-04-16 14:36:36] [INFO] Deactivated 85 expired matches.
+[2026-04-16 14:36:36] [INFO] === Cron scrape completed ===
+[2026-04-16 14:55:16] [INFO] === Cron scrape started ===
+[2026-04-16 14:55:16] [INFO] Starting schedule scrape...
+[2026-04-16 14:55:17] [INFO] Schedules done. Sports processed: 52
+[2026-04-16 14:55:17] [INFO] Starting deep scrape for 50 sports...
+[2026-04-16 14:55:20] [INFO] === Settlement cron started ===
+[2026-04-16 14:55:20] [INFO] Settlement done. Matches resolved: 0, Bets settled: 0 (Won: 0, Lost: 0), Payouts: €0.00, Time: 1ms
+[2026-04-16 14:55:20] [INFO] === Settlement cron completed ===
+[2026-04-16 14:55:21] [INFO] Batch 1/10 done. Running total: 147 matches, 620 odds
+[2026-04-16 14:55:27] [INFO] Batch 2/10 done. Running total: 157 matches, 620 odds
+[2026-04-16 14:55:32] [INFO] Batch 3/10 done. Running total: 350 matches, 620 odds
+[2026-04-16 14:55:37] [INFO] Batch 4/10 done. Running total: 354 matches, 620 odds
+[2026-04-16 14:55:42] [INFO] === Cron scrape started ===
+[2026-04-16 14:55:42] [INFO] Starting schedule scrape...
+[2026-04-16 14:55:42] [INFO] Batch 5/10 done. Running total: 375 matches, 620 odds
+[2026-04-16 14:55:43] [INFO] Schedules done. Sports processed: 52
+[2026-04-16 14:55:43] [INFO] Starting deep scrape for 50 sports...
+[2026-04-16 14:55:48] [INFO] Batch 6/10 done. Running total: 403 matches, 620 odds
+[2026-04-16 14:55:49] [INFO] Batch 1/10 done. Running total: 147 matches, 620 odds
+[2026-04-16 14:55:53] [INFO] Batch 7/10 done. Running total: 411 matches, 620 odds
+[2026-04-16 14:55:55] [INFO] Batch 2/10 done. Running total: 157 matches, 620 odds
+[2026-04-16 14:56:03] [INFO] Batch 3/10 done. Running total: 350 matches, 620 odds
+[2026-04-16 14:56:04] [INFO] Batch 8/10 done. Running total: 411 matches, 620 odds
+[2026-04-16 14:56:11] [INFO] Batch 4/10 done. Running total: 354 matches, 620 odds
+[2026-04-16 14:56:12] [INFO] Batch 9/10 done. Running total: 426 matches, 620 odds
+[2026-04-16 14:56:17] [INFO] Batch 5/10 done. Running total: 375 matches, 620 odds
+[2026-04-16 14:56:20] [INFO] Batch 10/10 done. Running total: 426 matches, 620 odds
+[2026-04-16 14:56:20] [INFO] Sync: deactivated 2 matches no longer in API feed.
+[2026-04-16 14:56:20] [INFO] Deep scrape complete. Matches: 426, Odds: 620, Deactivated: 2
+[2026-04-16 14:56:20] [INFO] Deactivated 75 expired matches.
+[2026-04-16 14:56:20] [INFO] === Cron scrape completed ===
+[2026-04-16 14:56:22] [INFO] Batch 6/10 done. Running total: 403 matches, 620 odds
+[2026-04-16 14:56:26] [INFO] Batch 7/10 done. Running total: 411 matches, 620 odds
+[2026-04-16 14:56:35] [INFO] Batch 8/10 done. Running total: 411 matches, 620 odds
+[2026-04-16 14:56:40] [INFO] Batch 9/10 done. Running total: 426 matches, 620 odds
+[2026-04-16 14:56:46] [INFO] Batch 10/10 done. Running total: 426 matches, 620 odds
+[2026-04-16 14:56:46] [INFO] Deep scrape complete. Matches: 426, Odds: 620, Deactivated: 0
+[2026-04-16 14:56:46] [INFO] Deactivated 6 expired matches.
+[2026-04-16 14:56:46] [INFO] === Cron scrape completed ===

@@ -1,0 +1,376 @@
+<?php
+/**
+ * User Deposit Page — Select payment method, submit deposit request with screenshot
+ */
+require_once dirname(__DIR__, 2) . '/bootstrap.php';
+
+use App\Core\Database;
+
+$db = Database::getInstance($config['db'])->getPdo();
+
+// Check logged in
+$loggedIn = !empty($_SESSION['user_id']);
+$currentUser = null;
+if ($loggedIn) {
+    $stmt = $db->prepare('SELECT id, username, balance FROM users WHERE id = ?');
+    $stmt->execute([$_SESSION['user_id']]);
+    $currentUser = $stmt->fetch();
+}
+?>
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinBet — Deposit</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        :root {
+            --bg-body: #0d0f14; --bg-surface: #161a24; --bg-card: #1a1f2b;
+            --gold: #f0b90b; --gold-hover: #d4a20a; --green: #22c55e;
+            --red: #ef4444; --purple: #7c3aed; --border: #1e293b;
+            --text-main: #e2e8f0; --text-muted: #64748b;
+        }
+        body { background: var(--bg-body); color: var(--text-main); font-family: 'Segoe UI', system-ui, sans-serif; }
+        .text-gold { color: var(--gold) !important; }
+        .btn-gold { background: linear-gradient(135deg, var(--gold), var(--gold-hover)); color: #000; border: none; font-weight: 600; padding: 10px 24px; border-radius: 8px; }
+        .btn-gold:hover { background: var(--gold-hover); color: #000; transform: translateY(-1px); }
+        .card-custom { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; }
+        .card-custom .card-header { background: var(--bg-surface); border-bottom: 1px solid var(--border); border-radius: 12px 12px 0 0 !important; padding: 14px 20px; }
+        .method-select-card { background: var(--bg-surface); border: 2px solid var(--border); border-radius: 12px; padding: 18px; cursor: pointer; transition: all .2s; }
+        .method-select-card:hover { border-color: var(--gold); transform: translateY(-2px); }
+        .method-select-card.selected { border-color: var(--gold); background: rgba(240, 185, 11, 0.06); box-shadow: 0 0 0 1px var(--gold); }
+        .method-select-card .method-name { font-weight: 600; font-size: 1rem; }
+        .method-select-card .method-type { font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+        .method-select-card .method-range { font-size: 0.8rem; color: var(--gold); }
+        .navbar-dep { background: var(--bg-surface); border-bottom: 1px solid var(--border); }
+        .form-control, .form-select { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-main); }
+        .form-control:focus, .form-select:focus { background: var(--bg-surface); border-color: var(--gold); color: var(--text-main); box-shadow: 0 0 0 2px rgba(240,185,11,0.15); }
+        .form-label { color: var(--text-muted); font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+        .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all .2s; }
+        .upload-zone:hover, .upload-zone.dragover { border-color: var(--gold); background: rgba(240,185,11,0.04); }
+        .upload-zone img { max-height: 120px; border-radius: 8px; margin-top: 10px; }
+        .table-dark-custom { --bs-table-bg: transparent; --bs-table-border-color: var(--border); }
+        .table-dark-custom th { color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; }
+        .table-dark-custom td { font-size: 0.85rem; vertical-align: middle; }
+        .badge-pending { background: rgba(240, 185, 11, 0.15); color: var(--gold); }
+        .badge-approved { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+        .badge-rejected { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+        .instructions-box { background: var(--bg-body); border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-size: 0.88rem; line-height: 1.6; }
+        .step-number { width: 32px; height: 32px; border-radius: 50%; background: var(--gold); color: #000; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; }
+        .swal2-popup { background: var(--bg-card) !important; color: var(--text-main) !important; border: 1px solid var(--border); }
+        .swal2-title { color: var(--text-main) !important; }
+        .swal2-html-container { color: var(--text-muted) !important; }
+        .swal2-confirm { background: var(--gold) !important; color: #000 !important; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-dark navbar-dep sticky-top px-3">
+    <a class="navbar-brand fw-bold" href="/bet/public/">
+        <i class="bi bi-trophy-fill text-gold"></i> WinBet
+    </a>
+    <div class="d-flex align-items-center gap-3">
+        <?php if ($loggedIn && $currentUser): ?>
+            <span class="text-gold fw-bold">€<?= number_format((float)$currentUser['balance'], 2) ?></span>
+            <span class="text-muted small"><?= htmlspecialchars($currentUser['username']) ?></span>
+        <?php endif; ?>
+        <a href="/bet/public/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-house"></i> Home</a>
+    </div>
+</nav>
+
+<div class="container py-4" style="max-width: 900px;">
+
+    <?php if (!$loggedIn): ?>
+    <div class="text-center py-5">
+        <i class="bi bi-lock-fill text-gold" style="font-size: 3rem;"></i>
+        <h4 class="mt-3">Login Required</h4>
+        <p class="text-muted">You need to be logged in to make a deposit.</p>
+        <a href="/bet/public/" class="btn btn-gold">Go to Login</a>
+    </div>
+    <?php else: ?>
+
+    <h4 class="text-gold mb-4"><i class="bi bi-cash-stack"></i> Make a Deposit</h4>
+
+    <!-- STEP 1: Select Payment Method -->
+    <div id="step1">
+        <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="step-number">1</div>
+            <h6 class="mb-0">Select Payment Method</h6>
+        </div>
+        <div class="row g-3" id="methodsGrid">
+            <div class="col-12 text-center text-muted py-4"><i class="bi bi-arrow-clockwise"></i> Loading methods...</div>
+        </div>
+    </div>
+
+    <!-- STEP 2: Payment Instructions (hidden initially) -->
+    <div id="step2" style="display: none;" class="mt-4">
+        <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="step-number">2</div>
+            <h6 class="mb-0">Follow Payment Instructions</h6>
+        </div>
+        <div class="instructions-box" id="instructionsBox"></div>
+    </div>
+
+    <!-- STEP 3: Fill Deposit Form (hidden initially) -->
+    <div id="step3" style="display: none;" class="mt-4">
+        <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="step-number">3</div>
+            <h6 class="mb-0">Submit Deposit Details</h6>
+        </div>
+
+        <div class="card-custom">
+            <div class="card-body p-4">
+                <form id="depositForm" enctype="multipart/form-data">
+                    <input type="hidden" id="selectedMethodId" name="method_id">
+
+                    <div class="mb-3">
+                        <label class="form-label">Amount (€)</label>
+                        <input type="number" class="form-control" id="depositAmount" name="amount" step="0.01" min="1" required>
+                        <div class="form-text" id="amountRange"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Transaction Code / Reference</label>
+                        <input type="text" class="form-control" id="transactionCode" name="transaction_code" placeholder="Enter the code from your payment" required>
+                        <div class="form-text">The unique reference code from your payment receipt</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Payment Screenshot (Optional)</label>
+                        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('screenshotInput').click()">
+                            <i class="bi bi-cloud-upload text-gold" style="font-size: 2rem;"></i>
+                            <p class="mt-2 mb-0 text-muted small">Click or drag & drop your payment screenshot</p>
+                            <p class="text-muted small mb-0">JPEG, PNG, WebP — Max 5MB</p>
+                            <img id="screenshotPreview" style="display:none;" alt="Preview">
+                        </div>
+                        <input type="file" id="screenshotInput" name="screenshot" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none">
+                    </div>
+
+                    <button type="submit" class="btn btn-gold w-100 py-2" id="submitBtn">
+                        <i class="bi bi-send-fill"></i> Submit Deposit Request
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEPOSIT HISTORY -->
+    <div class="mt-5">
+        <h5 class="text-gold mb-3"><i class="bi bi-clock-history"></i> Your Deposit History</h5>
+        <div class="card-custom">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark-custom mb-0">
+                        <thead>
+                            <tr><th>ID</th><th>Method</th><th>Amount</th><th>Code</th><th>Status</th><th>Date</th><th>Info</th></tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr><td colspan="7" class="text-center text-muted py-4">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <?php endif; ?>
+</div>
+
+<script>
+const API = '/bet/public/api/deposit_api.php';
+const ajaxHeaders = { 'Bypass-Tunnel-Reminder': 'true' };
+let selectedMethod = null;
+let methods = [];
+
+// ── LOAD PAYMENT METHODS ──
+async function loadMethods() {
+    try {
+        const res = await fetch(API + '?action=methods', { headers: ajaxHeaders });
+        const data = await res.json();
+        if (!data.success) return;
+        methods = data.methods;
+        renderMethods();
+    } catch (e) {
+        document.getElementById('methodsGrid').innerHTML = '<div class="col-12 text-center text-danger py-4">Failed to load payment methods</div>';
+    }
+}
+
+function renderMethods() {
+    const grid = document.getElementById('methodsGrid');
+    if (!methods.length) {
+        grid.innerHTML = '<div class="col-12 text-center text-muted py-4"><i class="bi bi-inbox" style="font-size:2rem;opacity:.3"></i><p class="mt-2">No payment methods available at the moment.</p></div>';
+        return;
+    }
+    grid.innerHTML = methods.map(m => `
+        <div class="col-md-6 col-lg-4">
+            <div class="method-select-card" onclick="selectMethod(${m.id})" id="method-${m.id}">
+                <div class="method-type"><i class="bi bi-${getTypeIcon(m.type)}"></i> ${m.type.replace('_', ' ')}</div>
+                <div class="method-name mt-1">${esc(m.name)}</div>
+                <div class="method-range mt-1">€${parseFloat(m.min_amount).toFixed(0)} — €${parseFloat(m.max_amount).toFixed(0)}</div>
+                <div class="small text-muted mt-1">Agent: ${esc(m.agent_name)}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function getTypeIcon(type) {
+    const icons = { mobile_wallet: 'phone', bank_transfer: 'bank', crypto: 'currency-bitcoin', other: 'wallet2' };
+    return icons[type] || 'wallet2';
+}
+
+function selectMethod(id) {
+    selectedMethod = methods.find(m => m.id === id);
+    if (!selectedMethod) return;
+
+    // Highlight selected
+    document.querySelectorAll('.method-select-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById('method-' + id).classList.add('selected');
+
+    // Show instructions
+    document.getElementById('selectedMethodId').value = id;
+    const instrBox = document.getElementById('instructionsBox');
+    instrBox.innerHTML = `
+        <div class="mb-2"><strong class="text-gold">${esc(selectedMethod.name)}</strong></div>
+        <div class="mb-2"><strong>Account:</strong> <code>${esc(selectedMethod.account_info)}</code>
+            <button class="btn btn-sm btn-outline-warning ms-2" onclick="copyText('${esc(selectedMethod.account_info)}')"><i class="bi bi-clipboard"></i></button>
+        </div>
+        ${selectedMethod.instructions ? `<div class="mt-2">${esc(selectedMethod.instructions).replace(/\n/g, '<br>')}</div>` : ''}
+    `;
+    document.getElementById('step2').style.display = '';
+
+    // Show form
+    const amountInput = document.getElementById('depositAmount');
+    amountInput.min = selectedMethod.min_amount;
+    amountInput.max = selectedMethod.max_amount;
+    document.getElementById('amountRange').textContent = `Min: €${parseFloat(selectedMethod.min_amount).toFixed(2)} — Max: €${parseFloat(selectedMethod.max_amount).toFixed(2)}`;
+    document.getElementById('step3').style.display = '';
+
+    // Scroll to instructions
+    document.getElementById('step2').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function copyText(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Copied!', showConfirmButton: false, timer: 1500 });
+    });
+}
+
+// ── SCREENSHOT UPLOAD ──
+const uploadZone = document.getElementById('uploadZone');
+const screenshotInput = document.getElementById('screenshotInput');
+const screenshotPreview = document.getElementById('screenshotPreview');
+
+if (uploadZone) {
+    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) {
+            screenshotInput.files = e.dataTransfer.files;
+            previewFile(e.dataTransfer.files[0]);
+        }
+    });
+    screenshotInput.addEventListener('change', () => {
+        if (screenshotInput.files.length) previewFile(screenshotInput.files[0]);
+    });
+}
+
+function previewFile(file) {
+    if (file.size > 5 * 1024 * 1024) {
+        Swal.fire('Error', 'File too large. Maximum 5MB.', 'error');
+        screenshotInput.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+        screenshotPreview.src = e.target.result;
+        screenshotPreview.style.display = '';
+    };
+    reader.readAsDataURL(file);
+}
+
+// ── SUBMIT DEPOSIT ──
+const depositForm = document.getElementById('depositForm');
+if (depositForm) {
+    depositForm.addEventListener('submit', async e => {
+        e.preventDefault();
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Submitting...';
+
+        const formData = new FormData(depositForm);
+        formData.append('action', 'submit_deposit');
+
+        try {
+            const res = await fetch(API, {
+                method: 'POST',
+                headers: { 'Bypass-Tunnel-Reminder': 'true' },
+                body: formData
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                Swal.fire('Success!', data.message, 'success');
+                depositForm.reset();
+                screenshotPreview.style.display = 'none';
+                selectedMethod = null;
+                document.querySelectorAll('.method-select-card').forEach(c => c.classList.remove('selected'));
+                document.getElementById('step2').style.display = 'none';
+                document.getElementById('step3').style.display = 'none';
+                loadHistory();
+            } else {
+                Swal.fire('Error', data.error || 'Failed to submit deposit', 'error');
+            }
+        } catch (err) {
+            Swal.fire('Error', 'Network error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-send-fill"></i> Submit Deposit Request';
+        }
+    });
+}
+
+// ── DEPOSIT HISTORY ──
+async function loadHistory() {
+    try {
+        const res = await fetch(API + '?action=history', { headers: ajaxHeaders });
+        const data = await res.json();
+        if (!data.success) return;
+
+        const tbody = document.getElementById('historyTableBody');
+        if (!data.deposits.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No deposit history yet</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.deposits.map(d => `
+            <tr>
+                <td>#${d.id}</td>
+                <td>${esc(d.method_name)}</td>
+                <td><strong>€${parseFloat(d.amount).toFixed(2)}</strong></td>
+                <td><code>${esc(d.transaction_code)}</code></td>
+                <td><span class="badge badge-${d.status}">${d.status.charAt(0).toUpperCase() + d.status.slice(1)}</span></td>
+                <td>${new Date(d.created_at).toLocaleDateString('en-GB', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+                <td>${d.status === 'rejected' && d.rejection_reason ? `<span class="text-danger small">${esc(d.rejection_reason)}</span>` : '—'}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error('Failed to load history:', e);
+    }
+}
+
+// ── HELPERS ──
+function esc(str) { const d = document.createElement('div'); d.textContent = str || ''; return d.innerHTML; }
+
+// ── INIT ──
+<?php if ($loggedIn): ?>
+loadMethods();
+loadHistory();
+<?php endif; ?>
+</script>
+</body>
+</html>

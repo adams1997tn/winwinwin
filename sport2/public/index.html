@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sport2 — Live Sportsbook</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/sport2.css">
+</head>
+<body>
+
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="app-wrapper">
+    <!-- ─── SIDEBAR ──────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <div class="logo-icon">S2</div>
+            <span>Sport<strong>2</strong></span>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">Sports</div>
+            <div id="sports-list">
+                <div class="loading-spinner"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ─── MAIN ─────────────────────────────────────────── -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="top-header">
+            <button class="hamburger" id="btn-hamburger">☰</button>
+
+            <div class="header-tabs">
+                <button class="header-tab active" data-tab="all">All</button>
+                <button class="header-tab" data-tab="live">Live</button>
+                <button class="header-tab" data-tab="upcoming">Upcoming</button>
+            </div>
+
+            <div class="header-live">
+                <span class="dot" style="width:6px;height:6px;background:var(--live-pulse);border-radius:50%;animation:pulse 1.5s infinite;"></span>
+                LIVE
+            </div>
+
+            <div class="header-search">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="search-input" placeholder="Search events...">
+            </div>
+
+            <div class="header-stats">
+                <div class="header-stat">
+                    <div class="stat-value" id="stat-total">—</div>
+                    <div class="stat-label">Events</div>
+                </div>
+                <div class="header-stat">
+                    <div class="stat-value" id="stat-live">—</div>
+                    <div class="stat-label">Live</div>
+                </div>
+                <div class="header-stat">
+                    <div class="stat-value" id="stat-sports">—</div>
+                    <div class="stat-label">Sports</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Health Status Bar -->
+        <div class="health-bar" id="health-bar">
+            <div class="health-indicator">
+                <div class="health-dot ok" id="health-dot"></div>
+                <span id="health-text">System Online</span>
+            </div>
+            <span style="margin-left:auto;color:var(--text-muted);font-size:10px;" id="last-sync-time"></span>
+        </div>
+
+        <!-- Events Content -->
+        <div class="content-area">
+            <div id="events-container">
+                <div class="loading-spinner"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ─── BETSLIP PANEL ─────────────────────────────── -->
+    <aside class="betslip-panel" id="betslip-panel">
+        <div class="betslip-header">
+            <div class="betslip-title">
+                <span>🎫</span> Bet Slip
+                <span class="betslip-count" id="betslip-count">0</span>
+            </div>
+            <button class="betslip-close" id="btn-close-betslip">✕</button>
+        </div>
+
+        <div class="betslip-tabs">
+            <button class="betslip-tab active" data-btype="single">Single</button>
+            <button class="betslip-tab" data-btype="combo">Combo</button>
+            <button class="betslip-tab" data-btype="system">System</button>
+        </div>
+
+        <div class="betslip-body" id="betslip-body">
+            <div class="betslip-empty">
+                <div class="betslip-empty-icon">🎫</div>
+                <p>Click on odds to add selections</p>
+            </div>
+        </div>
+
+        <div class="betslip-footer" id="betslip-footer" style="display:none;">
+            <div class="betslip-odds-warning" id="odds-warning" style="display:none;">
+                ⚠️ Odds have changed — slip updated
+            </div>
+            <div class="betslip-summary">
+                <div class="betslip-summary-row">
+                    <span>Total Odds:</span>
+                    <span id="betslip-total-odds">0.00</span>
+                </div>
+                <div class="betslip-summary-row">
+                    <span>Potential Win:</span>
+                    <span class="potential-win" id="betslip-potential-win">0.00</span>
+                </div>
+            </div>
+            <div class="betslip-stake-wrap">
+                <label>Stake</label>
+                <div class="stake-input-group">
+                    <input type="number" id="betslip-stake" placeholder="Enter stake" min="0" step="100">
+                    <div class="stake-quick-btns">
+                        <button data-amount="500">500</button>
+                        <button data-amount="1000">1K</button>
+                        <button data-amount="5000">5K</button>
+                        <button data-amount="10000">10K</button>
+                    </div>
+                </div>
+            </div>
+            <button class="betslip-place-btn" id="btn-place-bet">Place Bet</button>
+            <button class="betslip-clear-btn" id="btn-clear-slip">Clear All</button>
+        </div>
+    </aside>
+
+    <!-- ─── BETSLIP TOGGLE (mobile) ───────────────────── -->
+    <button class="betslip-fab" id="btn-betslip-fab" style="display:none;">
+        🎫 <span id="fab-count">0</span>
+    </button>
+
+    <!-- ─── AUTH BAR ─────────────────────────────────────── -->
+    <div class="auth-bar" id="auth-bar">
+        <div class="auth-logged-out" id="auth-logged-out">
+            <button class="auth-btn login-btn" id="btn-show-login">Log In</button>
+            <button class="auth-btn register-btn" id="btn-show-register">Register</button>
+        </div>
+        <div class="auth-logged-in" id="auth-logged-in" style="display:none;">
+            <span class="user-balance" id="user-balance">0.00</span>
+            <span class="user-name" id="user-name"></span>
+            <button class="auth-btn mybets-btn" id="btn-my-bets">My Bets</button>
+            <button class="auth-btn admin-btn" id="btn-admin-ggr" style="display:none;">GGR</button>
+            <button class="auth-btn logout-btn" id="btn-logout">Logout</button>
+        </div>
+    </div>
+
+    <!-- ─── AUTH MODAL ──────────────────────────────────── -->
+    <div class="modal-overlay" id="auth-modal" style="display:none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="auth-modal-title">Log In</h3>
+                <button class="modal-close" id="btn-close-auth">&times;</button>
+            </div>
+            <form id="auth-form" autocomplete="off">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="auth-username" required minlength="3" maxlength="50">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="auth-password" required minlength="6">
+                </div>
+                <div class="form-group" id="agent-code-group" style="display:none;">
+                    <label>Agent Code (optional)</label>
+                    <input type="text" id="auth-agent-code">
+                </div>
+                <div class="form-error" id="auth-error"></div>
+                <button type="submit" class="auth-submit-btn" id="auth-submit-btn">Log In</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ─── MY BETS MODAL ──────────────────────────────── -->
+    <div class="modal-overlay" id="mybets-modal" style="display:none;">
+        <div class="modal-box modal-wide">
+            <div class="modal-header">
+                <h3>My Bets</h3>
+                <button class="modal-close" id="btn-close-mybets">&times;</button>
+            </div>
+            <div class="mybets-tabs">
+                <button class="mybets-tab active" data-filter="active">Active</button>
+                <button class="mybets-tab" data-filter="settled">Settled</button>
+                <button class="mybets-tab" data-filter="cancelled">Cancelled</button>
+                <button class="mybets-tab" data-filter="all">All</button>
+            </div>
+            <div class="mybets-body" id="mybets-body">
+                <div class="loading-spinner"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── ADMIN GGR MODAL ─────────────────────────────── -->
+    <div class="modal-overlay" id="ggr-modal" style="display:none;">
+        <div class="modal-box modal-wide">
+            <div class="modal-header">
+                <h3>📊 GGR Dashboard</h3>
+                <button class="modal-close" id="btn-close-ggr">&times;</button>
+            </div>
+            <div class="ggr-filters">
+                <input type="date" id="ggr-date-from">
+                <input type="date" id="ggr-date-to">
+                <button class="auth-btn" id="btn-ggr-refresh">Refresh</button>
+            </div>
+            <div class="ggr-body" id="ggr-body">
+                <div class="loading-spinner"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="assets/js/sport2.js"></script>
+<script src="assets/js/betslip.js"></script>
+</body>
+</html>

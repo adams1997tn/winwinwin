@@ -1,0 +1,517 @@
+<?php
+/**
+ * Agent Panel — Payment method management + Deposit request queue
+ */
+require_once __DIR__ . '/guard.php';
+
+use App\Admin\PaymentManager;
+
+$paymentMgr = new PaymentManager($db);
+$agentId    = $agentUser['id'];
+
+$stats    = $paymentMgr->getAgentDepositStats($agentId);
+$methods  = $paymentMgr->getAgentPaymentMethods($agentId);
+$pending  = $paymentMgr->getAgentDepositRequests($agentId, 'pending', 50);
+$chart    = $paymentMgr->getDepositChartData(7, $agentId);
+?>
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinBet — Agent Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        :root {
+            --bg-body: #0d0f14; --bg-surface: #161a24; --bg-card: #1a1f2b;
+            --gold: #f0b90b; --gold-hover: #d4a20a; --green: #22c55e;
+            --red: #ef4444; --purple: #7c3aed; --border: #1e293b;
+            --text-main: #e2e8f0; --text-muted: #64748b;
+        }
+        body { background: var(--bg-body); color: var(--text-main); font-family: 'Segoe UI', system-ui, sans-serif; }
+        .text-gold { color: var(--gold) !important; }
+        .btn-gold { background: linear-gradient(135deg, var(--gold), var(--gold-hover)); color: #000; border: none; font-weight: 600; }
+        .btn-gold:hover { background: var(--gold-hover); color: #000; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+        .stat-card .stat-value { font-size: 1.5rem; font-weight: 700; }
+        .stat-card .stat-label { font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+        .stat-card .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+        .card-custom { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; }
+        .card-custom .card-header { background: var(--bg-surface); border-bottom: 1px solid var(--border); border-radius: 12px 12px 0 0 !important; padding: 14px 20px; }
+        .table-dark-custom { --bs-table-bg: transparent; --bs-table-border-color: var(--border); }
+        .table-dark-custom th { color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; }
+        .table-dark-custom td { vertical-align: middle; font-size: 0.85rem; }
+        .badge-pending { background: rgba(240, 185, 11, 0.15); color: var(--gold); }
+        .badge-approved { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+        .badge-rejected { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+        .badge-active { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+        .badge-inactive { background: rgba(100, 116, 139, 0.15); color: var(--text-muted); }
+        .navbar-admin { background: var(--bg-surface); border-bottom: 1px solid var(--border); }
+        .sidebar-admin { background: var(--bg-surface); border-right: 1px solid var(--border); min-height: calc(100vh - 56px); }
+        .sidebar-admin .nav-link { color: var(--text-muted); padding: 10px 16px; border-radius: 8px; font-size: 0.875rem; }
+        .sidebar-admin .nav-link:hover, .sidebar-admin .nav-link.active { color: var(--gold); background: rgba(240, 185, 11, 0.08); }
+        .screenshot-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 1px solid var(--border); }
+        .method-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; transition: transform .2s; }
+        .method-card:hover { transform: translateY(-2px); }
+        .swal2-popup { background: var(--bg-card) !important; color: var(--text-main) !important; border: 1px solid var(--border); }
+        .swal2-title { color: var(--text-main) !important; }
+        .swal2-html-container { color: var(--text-muted) !important; }
+        .swal2-confirm { background: var(--gold) !important; color: #000 !important; font-weight: 600; }
+        .swal2-cancel { background: var(--bg-surface) !important; color: var(--text-main) !important; border: 1px solid var(--border) !important; }
+        .swal2-input, .swal2-select, .swal2-textarea { background: var(--bg-surface) !important; color: var(--text-main) !important; border: 1px solid var(--border) !important; }
+    </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-dark navbar-admin sticky-top px-3">
+    <a class="navbar-brand fw-bold" href="/bet/public/agent/">
+        <i class="bi bi-person-badge-fill text-gold"></i> WinBet Agent Panel
+    </a>
+    <div class="d-flex align-items-center gap-3">
+        <span class="badge bg-info text-dark"><i class="bi bi-person-badge"></i> AGENT</span>
+        <span class="text-muted small"><i class="bi bi-person-fill"></i> <?= htmlspecialchars($agentUser['username']) ?></span>
+        <a href="/bet/public/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-house"></i> Site</a>
+    </div>
+</nav>
+
+<div class="container-fluid">
+<div class="row">
+
+<!-- SIDEBAR -->
+<nav class="col-lg-2 col-md-3 d-none d-md-block sidebar-admin py-3 px-2">
+    <div class="nav flex-column gap-1">
+        <a class="nav-link active" href="#" onclick="showTab('dashboard')"><i class="bi bi-speedometer2"></i> Dashboard</a>
+        <a class="nav-link" href="#" onclick="showTab('methods')"><i class="bi bi-credit-card"></i> Payment Methods</a>
+        <a class="nav-link" href="#" onclick="showTab('pending')">
+            <i class="bi bi-hourglass-split"></i> Pending Requests
+            <?php if ((int)$stats['pending_count'] > 0): ?>
+                <span class="badge badge-pending ms-1"><?= $stats['pending_count'] ?></span>
+            <?php endif; ?>
+        </a>
+        <a class="nav-link" href="#" onclick="showTab('history')"><i class="bi bi-clock-history"></i> History</a>
+    </div>
+</nav>
+
+<!-- MAIN -->
+<main class="col-lg-10 col-md-9 p-4">
+
+<!-- ═══ TAB: DASHBOARD ═══ -->
+<div id="tab-dashboard">
+    <h5 class="mb-4 text-gold"><i class="bi bi-speedometer2"></i> Agent Dashboard</h5>
+
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-sm-6">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="stat-label">Pending</div>
+                        <div class="stat-value text-warning"><?= (int)$stats['pending_count'] ?></div>
+                    </div>
+                    <div class="stat-icon" style="background:rgba(240,185,11,0.12)"><i class="bi bi-hourglass-split text-warning"></i></div>
+                </div>
+                <small class="text-muted">€<?= number_format((float)$stats['total_pending_amount'], 2) ?> pending</small>
+            </div>
+        </div>
+        <div class="col-xl-3 col-sm-6">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="stat-label">Approved</div>
+                        <div class="stat-value text-success"><?= (int)$stats['approved_count'] ?></div>
+                    </div>
+                    <div class="stat-icon" style="background:rgba(34,197,94,0.12)"><i class="bi bi-check-circle text-success"></i></div>
+                </div>
+                <small class="text-muted">€<?= number_format((float)$stats['total_approved_amount'], 2) ?> total</small>
+            </div>
+        </div>
+        <div class="col-xl-3 col-sm-6">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="stat-label">Rejected</div>
+                        <div class="stat-value text-danger"><?= (int)$stats['rejected_count'] ?></div>
+                    </div>
+                    <div class="stat-icon" style="background:rgba(239,68,68,0.12)"><i class="bi bi-x-circle text-danger"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-sm-6">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="stat-label">Total Requests</div>
+                        <div class="stat-value"><?= (int)$stats['total_requests'] ?></div>
+                    </div>
+                    <div class="stat-icon" style="background:rgba(124,58,237,0.12)"><i class="bi bi-list-ul" style="color:var(--purple)"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-custom mb-4">
+        <div class="card-header"><i class="bi bi-graph-up"></i> Your Deposit Activity (7 Days)</div>
+        <div class="card-body p-3">
+            <canvas id="agentChart" height="100"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ TAB: PAYMENT METHODS ═══ -->
+<div id="tab-methods" style="display:none">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="mb-0 text-gold"><i class="bi bi-credit-card"></i> Payment Methods</h5>
+        <button class="btn btn-gold btn-sm" onclick="showCreateMethodModal()"><i class="bi bi-plus-lg"></i> Add Method</button>
+    </div>
+
+    <div class="row g-3" id="methodsGrid">
+        <?php foreach ($methods as $m): ?>
+        <div class="col-xl-4 col-md-6" id="method-card-<?= $m['id'] ?>">
+            <div class="method-card">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h6 class="mb-0"><?= htmlspecialchars($m['name']) ?></h6>
+                    <span class="badge badge-<?= $m['status'] ?>"><?= ucfirst($m['status']) ?></span>
+                </div>
+                <div class="small text-muted mb-1"><strong>Type:</strong> <?= ucfirst(str_replace('_', ' ', $m['type'])) ?></div>
+                <div class="small text-muted mb-1"><strong>Account:</strong> <?= htmlspecialchars($m['account_info']) ?></div>
+                <div class="small text-muted mb-2"><strong>Range:</strong> €<?= number_format((float)$m['min_amount'], 2) ?> — €<?= number_format((float)$m['max_amount'], 2) ?></div>
+                <?php if ($m['instructions']): ?>
+                    <div class="small text-muted mb-2"><strong>Instructions:</strong> <?= nl2br(htmlspecialchars(substr($m['instructions'], 0, 120))) ?></div>
+                <?php endif; ?>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-outline-warning btn-sm" onclick="editMethod(<?= htmlspecialchars(json_encode($m)) ?>)"><i class="bi bi-pencil"></i> Edit</button>
+                    <?php if ($m['status'] === 'active'): ?>
+                        <button class="btn btn-outline-danger btn-sm" onclick="deleteMethod(<?= $m['id'] ?>)"><i class="bi bi-trash"></i> Deactivate</button>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+        <?php if (empty($methods)): ?>
+        <div class="col-12">
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-credit-card-2-front" style="font-size:3rem;opacity:.3"></i>
+                <p class="mt-2">No payment methods yet. Click "Add Method" to create one.</p>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- ═══ TAB: PENDING REQUESTS ═══ -->
+<div id="tab-pending" style="display:none">
+    <h5 class="mb-4 text-gold"><i class="bi bi-hourglass-split"></i> Pending Deposit Requests</h5>
+
+    <div class="card-custom">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-dark-custom mb-0">
+                    <thead>
+                        <tr><th>ID</th><th>User</th><th>Method</th><th>Amount</th><th>Code</th><th>Screenshot</th><th>Date</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody id="pendingTableBody">
+                        <?php foreach ($pending as $d): ?>
+                        <tr id="pending-row-<?= $d['id'] ?>">
+                            <td>#<?= $d['id'] ?></td>
+                            <td><strong><?= htmlspecialchars($d['user_name']) ?></strong></td>
+                            <td><?= htmlspecialchars($d['method_name']) ?></td>
+                            <td><strong class="text-gold">€<?= number_format((float)$d['amount'], 2) ?></strong></td>
+                            <td><code><?= htmlspecialchars($d['transaction_code']) ?></code></td>
+                            <td>
+                                <?php if ($d['screenshot_path']): ?>
+                                    <img src="/bet/uploads/transactions/<?= htmlspecialchars($d['screenshot_path']) ?>" class="screenshot-thumb" onclick="viewScreenshot('/bet/uploads/transactions/<?= htmlspecialchars($d['screenshot_path']) ?>')">
+                                <?php else: ?>
+                                    <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= date('d M H:i', strtotime($d['created_at'])) ?></td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-success btn-sm" onclick="approveDeposit(<?= $d['id'] ?>)"><i class="bi bi-check-lg"></i> Approve</button>
+                                    <button class="btn btn-danger btn-sm" onclick="rejectDeposit(<?= $d['id'] ?>)"><i class="bi bi-x-lg"></i> Reject</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if (empty($pending)): ?>
+                        <tr><td colspan="8" class="text-center text-muted py-4"><i class="bi bi-inbox"></i> No pending requests</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ TAB: HISTORY ═══ -->
+<div id="tab-history" style="display:none">
+    <h5 class="mb-4 text-gold"><i class="bi bi-clock-history"></i> Deposit History</h5>
+
+    <div class="d-flex gap-2 mb-3">
+        <button class="btn btn-sm btn-outline-warning active" onclick="loadHistory(null, this)">All</button>
+        <button class="btn btn-sm btn-outline-success" onclick="loadHistory('approved', this)">Approved</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="loadHistory('rejected', this)">Rejected</button>
+    </div>
+
+    <div class="card-custom">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-dark-custom mb-0">
+                    <thead>
+                        <tr><th>ID</th><th>User</th><th>Method</th><th>Amount</th><th>Code</th><th>Status</th><th>Date</th><th>Processed</th></tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <tr><td colspan="8" class="text-center text-muted py-4">Click a filter to load history</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+</main>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const API = '/bet/public/api/agent_api.php';
+const headers = { 'Content-Type': 'application/json', 'Bypass-Tunnel-Reminder': 'true' };
+
+// ── TAB NAVIGATION ──
+function showTab(name) {
+    document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+    const tab = document.getElementById('tab-' + name);
+    if (tab) tab.style.display = '';
+    document.querySelectorAll('.sidebar-admin .nav-link').forEach(el => el.classList.remove('active'));
+    event.target.closest('.nav-link')?.classList.add('active');
+
+    if (name === 'pending') loadPending();
+    if (name === 'history') loadHistory(null);
+}
+
+// ── CHART ──
+const chartData = <?= json_encode($chart) ?>;
+new Chart(document.getElementById('agentChart'), {
+    type: 'bar',
+    data: {
+        labels: chartData.labels,
+        datasets: [
+            { label: 'Approved (€)', data: chartData.approved, backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 4 },
+            { label: 'Rejected (€)', data: chartData.rejected, backgroundColor: 'rgba(239,68,68,0.5)', borderRadius: 4 }
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: '#64748b' } } },
+        scales: {
+            x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+            y: { ticks: { color: '#64748b', callback: v => '€' + v }, grid: { color: '#1e293b' } }
+        }
+    }
+});
+
+// ── PAYMENT METHOD CRUD ──
+function showCreateMethodModal() {
+    Swal.fire({
+        title: 'Add Payment Method',
+        html: `
+            <input id="swal-name" class="swal2-input" placeholder="Name (e.g. Vodafone Cash)">
+            <select id="swal-type" class="swal2-select">
+                <option value="mobile_wallet">Mobile Wallet</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="crypto">Crypto</option>
+                <option value="other">Other</option>
+            </select>
+            <input id="swal-account" class="swal2-input" placeholder="Account/Wallet Number">
+            <textarea id="swal-instructions" class="swal2-textarea" placeholder="Instructions for user (optional)"></textarea>
+            <input id="swal-min" class="swal2-input" placeholder="Min Amount" type="number" value="10">
+            <input id="swal-max" class="swal2-input" placeholder="Max Amount" type="number" value="10000">
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Create',
+        preConfirm: () => {
+            const name = document.getElementById('swal-name').value.trim();
+            const account_info = document.getElementById('swal-account').value.trim();
+            if (!name || !account_info) { Swal.showValidationMessage('Name and account info are required'); return false; }
+            return {
+                name,
+                type: document.getElementById('swal-type').value,
+                account_info,
+                instructions: document.getElementById('swal-instructions').value.trim(),
+                min_amount: parseFloat(document.getElementById('swal-min').value) || 10,
+                max_amount: parseFloat(document.getElementById('swal-max').value) || 10000
+            };
+        }
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        apiPost('create_method', result.value).then(res => {
+            if (res.success) Swal.fire('Created!', res.message, 'success').then(() => location.reload());
+        });
+    });
+}
+
+function editMethod(method) {
+    Swal.fire({
+        title: `Edit: ${method.name}`,
+        html: `
+            <input id="swal-name" class="swal2-input" placeholder="Name" value="${esc(method.name)}">
+            <select id="swal-type" class="swal2-select">
+                <option value="mobile_wallet" ${method.type==='mobile_wallet'?'selected':''}>Mobile Wallet</option>
+                <option value="bank_transfer" ${method.type==='bank_transfer'?'selected':''}>Bank Transfer</option>
+                <option value="crypto" ${method.type==='crypto'?'selected':''}>Crypto</option>
+                <option value="other" ${method.type==='other'?'selected':''}>Other</option>
+            </select>
+            <input id="swal-account" class="swal2-input" placeholder="Account Info" value="${esc(method.account_info)}">
+            <textarea id="swal-instructions" class="swal2-textarea" placeholder="Instructions">${esc(method.instructions || '')}</textarea>
+            <input id="swal-min" class="swal2-input" type="number" value="${method.min_amount}">
+            <input id="swal-max" class="swal2-input" type="number" value="${method.max_amount}">
+            <select id="swal-status" class="swal2-select">
+                <option value="active" ${method.status==='active'?'selected':''}>Active</option>
+                <option value="inactive" ${method.status==='inactive'?'selected':''}>Inactive</option>
+            </select>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Update',
+        preConfirm: () => ({
+            method_id: method.id,
+            name: document.getElementById('swal-name').value.trim(),
+            type: document.getElementById('swal-type').value,
+            account_info: document.getElementById('swal-account').value.trim(),
+            instructions: document.getElementById('swal-instructions').value.trim(),
+            min_amount: parseFloat(document.getElementById('swal-min').value) || 10,
+            max_amount: parseFloat(document.getElementById('swal-max').value) || 10000,
+            status: document.getElementById('swal-status').value
+        })
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        apiPost('update_method', result.value).then(res => {
+            if (res.success) Swal.fire('Updated', res.message, 'success').then(() => location.reload());
+        });
+    });
+}
+
+function deleteMethod(id) {
+    Swal.fire({
+        title: 'Deactivate Method?',
+        text: 'Users will no longer see this method. Existing requests are not affected.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Deactivate',
+        confirmButtonColor: '#ef4444'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        apiPost('delete_method', { method_id: id }).then(res => {
+            if (res.success) Swal.fire('Done', res.message, 'success').then(() => location.reload());
+        });
+    });
+}
+
+// ── DEPOSIT ACTIONS ──
+function loadPending() {
+    fetch(API + '?action=deposits&status=pending', { headers }).then(r => r.json()).then(res => {
+        if (!res.success) return;
+        renderDepositsTable('pendingTableBody', res.deposits, true);
+    });
+}
+
+function loadHistory(status, btn) {
+    if (btn) {
+        btn.closest('.d-flex').querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+    const url = API + '?action=deposits' + (status ? '&status=' + status : '');
+    fetch(url, { headers }).then(r => r.json()).then(res => {
+        if (!res.success) return;
+        renderDepositsTable('historyTableBody', res.deposits, false);
+    });
+}
+
+function renderDepositsTable(tbodyId, deposits, showActions) {
+    const tbody = document.getElementById(tbodyId);
+    if (!deposits.length) {
+        const cols = showActions ? 8 : 8;
+        tbody.innerHTML = `<tr><td colspan="${cols}" class="text-center text-muted py-4">No deposits found</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = deposits.map(d => `
+        <tr>
+            <td>#${d.id}</td>
+            <td><strong>${esc(d.user_name)}</strong></td>
+            <td>${esc(d.method_name)}</td>
+            <td><strong class="text-gold">€${parseFloat(d.amount).toFixed(2)}</strong></td>
+            <td><code>${esc(d.transaction_code)}</code></td>
+            ${showActions ? `
+                <td>${d.screenshot_path ? `<img src="/bet/uploads/transactions/${esc(d.screenshot_path)}" class="screenshot-thumb" onclick="viewScreenshot('/bet/uploads/transactions/${esc(d.screenshot_path)}')">` : '<span class="text-muted">—</span>'}</td>
+                <td>${formatDate(d.created_at)}</td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-success btn-sm" onclick="approveDeposit(${d.id})"><i class="bi bi-check-lg"></i></button>
+                        <button class="btn btn-danger btn-sm" onclick="rejectDeposit(${d.id})"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                </td>
+            ` : `
+                <td><span class="badge badge-${d.status}">${d.status.charAt(0).toUpperCase() + d.status.slice(1)}</span></td>
+                <td>${formatDate(d.created_at)}</td>
+                <td>${d.processed_at ? formatDate(d.processed_at) : '—'}</td>
+            `}
+        </tr>
+    `).join('');
+}
+
+function approveDeposit(id) {
+    Swal.fire({
+        title: 'Approve Deposit?',
+        text: 'This will credit the user\'s balance immediately.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Approve'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        apiPost('approve_deposit', { request_id: id }).then(res => {
+            if (res.success) Swal.fire('Approved!', res.message, 'success').then(() => { loadPending(); location.reload(); });
+        });
+    });
+}
+
+function rejectDeposit(id) {
+    Swal.fire({
+        title: 'Reject Deposit',
+        input: 'textarea',
+        inputPlaceholder: 'Reason for rejection (optional)',
+        showCancelButton: true,
+        confirmButtonText: 'Reject',
+        confirmButtonColor: '#ef4444'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        apiPost('reject_deposit', { request_id: id, reason: result.value }).then(res => {
+            if (res.success) Swal.fire('Rejected', res.message, 'info').then(() => { loadPending(); location.reload(); });
+        });
+    });
+}
+
+function viewScreenshot(url) {
+    Swal.fire({ imageUrl: url, imageAlt: 'Screenshot', showConfirmButton: false, showCloseButton: true, width: '80%' });
+}
+
+// ── HELPERS ──
+function esc(str) { const d = document.createElement('div'); d.textContent = str || ''; return d.innerHTML; }
+function formatDate(str) { return new Date(str).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+
+async function apiPost(action, data = {}) {
+    try {
+        const res = await fetch(API, { method: 'POST', headers, body: JSON.stringify({ action, ...data }) });
+        const json = await res.json();
+        if (!json.success) Swal.fire('Error', json.error || 'Unknown error', 'error');
+        return json;
+    } catch (e) {
+        Swal.fire('Error', 'Network error: ' + e.message, 'error');
+        return { success: false };
+    }
+}
+</script>
+</body>
+</html>
